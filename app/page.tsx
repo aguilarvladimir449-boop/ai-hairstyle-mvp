@@ -483,7 +483,7 @@ export default function Home() {
     <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-8 px-4 py-6 sm:px-6 lg:px-8">
       <header className="flex flex-col gap-3 border-b border-slate-200 pb-6 md:flex-row md:items-end md:justify-between">
         <div>
-          <p className="text-sm font-semibold text-teal-700">AI Hairstyle Studio</p>
+          <p className="text-sm font-semibold text-teal-700">JUST FOR JJ</p>
           <h1 className="mt-2 text-3xl font-bold tracking-normal text-slate-950 sm:text-4xl">AI 换发型预览</h1>
           <p className="mt-3 max-w-2xl text-base leading-7 text-slate-600">
             上传一张人像照片，选择预设发型或让 AI 推荐，再生成真实照片风格的发型预览。

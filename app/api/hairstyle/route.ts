@@ -13,6 +13,7 @@ type HairstyleResponse = {
   imageUrl: string;
   mock: boolean;
   hairstyleId?: string;
+  customHairstyleDescription?: string;
   usedMask: boolean;
   usedReferenceImage: boolean;
   providerMode: "images_edit" | "chat_completions";
@@ -20,18 +21,9 @@ type HairstyleResponse = {
 };
 
 function validateMaskFile(file: File | null): string | null {
-  if (!file) {
-    return null;
-  }
-
-  if (file.type !== "image/png") {
-    return "mask 必须是 PNG 图片。";
-  }
-
-  if (file.size > 10 * 1024 * 1024) {
-    return "mask 图片不能超过 10MB。";
-  }
-
+  if (!file) return null;
+  if (file.type !== "image/png") return "mask 必须是 PNG 图片。";
+  if (file.size > 10 * 1024 * 1024) return "mask 图片不能超过 10MB。";
   return null;
 }
 
@@ -49,17 +41,18 @@ function parseBoolean(value: FormDataEntryValue | null) {
   return value === "true" || value === "1" || value === "on";
 }
 
+function parseCustomHairstyleDescription(value: FormDataEntryValue | null) {
+  if (typeof value !== "string") return "";
+  return value.replace(/\s+/g, " ").trim().slice(0, 600);
+}
+
 function parseSelectedHairColor(value: FormDataEntryValue | null): SelectedHairColor | undefined {
-  if (typeof value !== "string" || !value.trim()) {
-    return undefined;
-  }
+  if (typeof value !== "string" || !value.trim()) return undefined;
 
   try {
     const parsed = JSON.parse(value) as Partial<SelectedHairColor>;
     const hex = typeof parsed.hex === "string" ? normalizeHexColor(parsed.hex) : null;
-    if (!hex) {
-      return undefined;
-    }
+    if (!hex) return undefined;
 
     const mode = ["full", "subtle", "highlight", "gradient", "inner"].includes(String(parsed.mode))
       ? (parsed.mode as HairColorMode)
@@ -84,12 +77,8 @@ function extractGeneratedImage(content: unknown): string | null {
       : Array.isArray(content)
         ? content
             .map((item) => {
-              if (typeof item === "string") {
-                return item;
-              }
-              if (item && typeof item === "object" && "text" in item && typeof item.text === "string") {
-                return item.text;
-              }
+              if (typeof item === "string") return item;
+              if (item && typeof item === "object" && "text" in item && typeof item.text === "string") return item.text;
               return "";
             })
             .join("\n")
@@ -105,6 +94,7 @@ export async function POST(request: Request) {
     const referenceImage = formData.get("hairstyleReferenceImage");
     const mask = formData.get("mask");
     const hairstyleId = formData.get("hairstyleId");
+    const customHairstyleDescription = parseCustomHairstyleDescription(formData.get("customHairstyleDescription"));
     const quality = getRequestedQuality(formData.get("quality"));
     const useOriginalHairColor = parseBoolean(formData.get("useOriginalHairColor"));
     const useReferenceHairColor = parseBoolean(formData.get("useReferenceHairColor"));
@@ -132,17 +122,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: maskError }, { status: 400 });
     }
 
-    if (!referenceImageFile && !hairstyleIdValue) {
-      return NextResponse.json({ error: "请选择一个发型。" }, { status: 400 });
+    if (!referenceImageFile && !hairstyleIdValue && !customHairstyleDescription) {
+      return NextResponse.json({ error: "请选择一个发型，或输入自定义发型描述。" }, { status: 400 });
     }
 
     const preset = hairstyleIdValue ? hairstylePresetById.get(hairstyleIdValue) : undefined;
-    if (!preset && !referenceImageFile) {
+    if (hairstyleIdValue && !preset) {
       return NextResponse.json({ error: "未找到对应的发型预设。" }, { status: 400 });
+    }
+
+    if (customHairstyleDescription && customHairstyleDescription.length < 4) {
+      return NextResponse.json({ error: "自定义发型描述太短，请至少输入 4 个字。" }, { status: 400 });
     }
 
     const prompt = buildHairstylePrompt({
       preset,
+      customHairstyleDescription,
       hasReferenceImage: Boolean(referenceImageFile),
       selectedHairColor,
       useOriginalHairColor,
@@ -152,6 +147,7 @@ export async function POST(request: Request) {
     const generationInput: GenerateHairstyleInput = {
       userImage: image,
       hairstyleId: preset?.id,
+      customHairstyleDescription,
       hairstyleReferenceImage: referenceImageFile || undefined,
       mask: maskFile || undefined,
       selectedHairColor,
@@ -168,6 +164,7 @@ export async function POST(request: Request) {
         imageUrl: originalDataUrl,
         mock: true,
         hairstyleId: preset?.id,
+        customHairstyleDescription: customHairstyleDescription || undefined,
         usedMask: Boolean(maskFile),
         usedReferenceImage: Boolean(referenceImageFile),
         providerMode,
@@ -188,9 +185,7 @@ export async function POST(request: Request) {
       const chatPrompt = [
         "请基于用户提供的人像照片生成一张换发型后的真实照片。",
         generationInput.prompt,
-        referenceImageDataUrl
-          ? "第二张图片是发型参考图，仅参考头发造型和发色设置，不要复制参考图人物身份。"
-          : null,
+        referenceImageDataUrl ? "第二张图片是发型参考图，只参考头发造型和发色设置，不要复制参考图人物身份。" : null,
         maskDataUrl
           ? "另有一张用户手绘的头发区域 mask：透明区域表示允许编辑的区域，黑色区域表示必须保持不变。请尽量只编辑 mask 对应的头发区域，避免改变脸、五官、表情、衣服和背景。"
           : "用户没有提供 mask。请只识别并修改头发区域，避免改变脸、五官、表情、衣服和背景。",
@@ -225,6 +220,7 @@ export async function POST(request: Request) {
         imageUrl: generatedImage,
         mock: false,
         hairstyleId: preset?.id,
+        customHairstyleDescription: customHairstyleDescription || undefined,
         usedMask: Boolean(maskFile),
         usedReferenceImage: Boolean(referenceImageFile),
         providerMode
@@ -250,7 +246,6 @@ export async function POST(request: Request) {
 
     const result = await openai.images.edit({
       model: process.env.OPENAI_IMAGE_MODEL || "gpt-image-1",
-      // TODO: Keep a provider capability map. Some OpenAI-compatible providers may not support multi-image edits.
       image: referenceFileForOpenAI ? [imageFile, referenceFileForOpenAI] : imageFile,
       ...(maskFileForOpenAI ? { mask: maskFileForOpenAI } : {}),
       prompt: generationInput.prompt,
@@ -273,6 +268,7 @@ export async function POST(request: Request) {
       imageUrl,
       mock: false,
       hairstyleId: preset?.id,
+      customHairstyleDescription: customHairstyleDescription || undefined,
       usedMask: Boolean(maskFile),
       usedReferenceImage: Boolean(referenceImageFile),
       providerMode

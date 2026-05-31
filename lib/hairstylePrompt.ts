@@ -3,6 +3,7 @@ import { hairColorModeLabels, type SelectedHairColor } from "@/lib/hairColor";
 
 export type BuildHairstylePromptInput = {
   preset?: HairstylePreset;
+  customHairstyleDescription?: string;
   hasReferenceImage?: boolean;
   selectedHairColor?: SelectedHairColor;
   useOriginalHairColor?: boolean;
@@ -11,6 +12,7 @@ export type BuildHairstylePromptInput = {
 
 export function buildHairstylePrompt({
   preset,
+  customHairstyleDescription,
   hasReferenceImage = false,
   selectedHairColor,
   useOriginalHairColor = false,
@@ -30,7 +32,11 @@ export function buildHairstylePrompt({
 
     if (preset) {
       parts.push(`预设发型“${preset.name}”只作为辅助风格提示；最终以参考图中的头发造型为主。辅助提示：${preset.prompt}`);
+    } else if (customHairstyleDescription) {
+      parts.push(`用户自定义发型描述只作为辅助风格提示；最终仍以参考图中的头发造型为主。自定义描述：${customHairstyleDescription}`);
     }
+  } else if (customHairstyleDescription) {
+    parts.push(`用户自定义目标发型描述：${customHairstyleDescription}。请把这段描述转化为真实自然的头发造型，只修改头发区域。`);
   } else if (preset) {
     parts.push(`目标预设发型：${preset.name}。${preset.prompt}`);
   }

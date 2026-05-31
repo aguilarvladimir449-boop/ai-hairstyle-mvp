@@ -4,7 +4,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
-import { Brush, Download, Eraser, Loader2, RotateCcw, Search, Sparkles, Wand2 } from "lucide-react";
+import { Brush, Download, Eraser, Loader2, PencilLine, RotateCcw, Search, Sparkles, Wand2 } from "lucide-react";
 import { HairColorPicker } from "@/components/HairColorPicker";
 import { HairColorEditor } from "@/components/HairColorEditor";
 import { ImageUploader } from "@/components/ImageUploader";
@@ -27,6 +27,7 @@ type Recommendation = {
 type CategoryFilter = HairstyleCategory | "all";
 type ImageQuality = "low" | "medium" | "high";
 type HairColorSource = "original" | "reference" | "custom";
+type HairstyleMode = "preset" | "custom";
 
 const categoryTabs: CategoryFilter[] = ["all", "short", "medium", "long", "bangs", "curly", "color", "style"];
 const imageQualityOptions: Array<{ value: ImageQuality; label: string; description: string }> = [
@@ -132,6 +133,8 @@ export default function Home() {
   const [referenceFile, setReferenceFile] = useState<File | null>(null);
   const [referencePreview, setReferencePreview] = useState("");
   const [selectedId, setSelectedId] = useState(hairstylePresets[0].id);
+  const [hairstyleMode, setHairstyleMode] = useState<HairstyleMode>("preset");
+  const [customHairstyleDescription, setCustomHairstyleDescription] = useState("");
   const [category, setCategory] = useState<CategoryFilter>("all");
   const [query, setQuery] = useState("");
   const [brushSize, setBrushSize] = useState(46);
@@ -158,6 +161,8 @@ export default function Home() {
   const [notice, setNotice] = useState("");
 
   const selectedPreset = hairstylePresetById.get(selectedId) || hairstylePresets[0];
+  const normalizedCustomHairstyle = customHairstyleDescription.trim();
+  const currentHairstyleLabel = hairstyleMode === "custom" ? (normalizedCustomHairstyle ? `自定义：${normalizedCustomHairstyle.slice(0, 24)}` : "自定义发型") : selectedPreset.name;
   const useOriginalHairColor = hairColorSource === "original";
   const useReferenceHairColor = hairColorSource === "reference" && Boolean(referenceFile);
   const recommendedIds = useMemo(() => new Set(recommendations.map((item) => item.hairstyleId)), [recommendations]);
@@ -412,6 +417,11 @@ export default function Home() {
   }
 
   async function generateHairstyle() {
+    if (hairstyleMode === "custom" && normalizedCustomHairstyle.length < 4) {
+      setError("请至少输入 4 个字的自定义发型描述。");
+      return;
+    }
+
     if (!imageFile) {
       setError("请先上传一张人像图片。");
       return;
@@ -426,7 +436,11 @@ export default function Home() {
       const formData = new FormData();
       formData.append("image", imageFile);
       formData.append("userImage", imageFile);
-      formData.append("hairstyleId", selectedPreset.id);
+      if (hairstyleMode === "custom") {
+        formData.append("customHairstyleDescription", normalizedCustomHairstyle);
+      } else {
+        formData.append("hairstyleId", selectedPreset.id);
+      }
       formData.append("quality", imageQuality);
       if (referenceFile) {
         formData.append("hairstyleReferenceImage", referenceFile);
@@ -624,7 +638,10 @@ export default function Home() {
                     <button
                       key={item.hairstyleId}
                       type="button"
-                      onClick={() => setSelectedId(item.hairstyleId)}
+                      onClick={() => {
+                        setSelectedId(item.hairstyleId);
+                        setHairstyleMode("preset");
+                      }}
                       className={clsx(
                         "w-full rounded-lg border p-3 text-left transition hover:border-teal-400 hover:bg-teal-50",
                         selectedId === item.hairstyleId ? "border-teal-500 bg-teal-50" : "border-slate-200 bg-white"
@@ -661,7 +678,7 @@ export default function Home() {
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 className="text-lg font-bold text-slate-950">发型库</h2>
-                <p className="mt-1 text-sm text-slate-500">当前选择：{selectedPreset.name}</p>
+                <p className="mt-1 text-sm text-slate-500">当前选择：{currentHairstyleLabel}</p>
               </div>
               <div className="relative w-full sm:max-w-xs">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
@@ -671,6 +688,47 @@ export default function Home() {
                   placeholder="搜索发型、标签或分类"
                   className="w-full rounded-md border-slate-300 pl-9 text-sm shadow-sm focus:border-teal-500 focus:ring-teal-500"
                 />
+              </div>
+            </div>
+
+            <div
+              className={clsx(
+                "mt-4 rounded-lg border p-4 transition",
+                hairstyleMode === "custom" ? "border-teal-500 bg-teal-50 shadow-sm" : "border-slate-200 bg-slate-50"
+              )}
+            >
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex items-start gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-white text-teal-700 shadow-sm">
+                    <PencilLine className="h-5 w-5" aria-hidden="true" />
+                  </span>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-950">自定义描述发型</h3>
+                    <p className="mt-1 text-sm leading-6 text-slate-500">可以输入想要的发型，例如“韩系三七分，顶部蓬松，两侧自然修短，保留黑色发色”。</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setHairstyleMode("custom")}
+                  className={clsx(
+                    "inline-flex shrink-0 items-center justify-center rounded-md px-4 py-2 text-sm font-semibold transition",
+                    hairstyleMode === "custom" ? "bg-teal-600 text-white shadow-sm" : "bg-white text-slate-800 shadow-sm hover:bg-slate-100"
+                  )}
+                >
+                  使用自定义描述
+                </button>
+              </div>
+              <textarea
+                value={customHairstyleDescription}
+                onChange={(event) => setCustomHairstyleDescription(event.target.value)}
+                onFocus={() => setHairstyleMode("custom")}
+                maxLength={600}
+                placeholder="描述你想要的发型、长度、刘海、卷度、层次、整体风格..."
+                className="mt-3 min-h-28 w-full resize-y rounded-md border-slate-300 text-sm leading-6 shadow-sm focus:border-teal-500 focus:ring-teal-500"
+              />
+              <div className="mt-2 flex items-center justify-between gap-3 text-xs text-slate-500">
+                <span>{hairstyleMode === "custom" ? "当前将使用这段描述生成发型。" : "点击输入框或按钮即可切换到自定义发型。"}</span>
+                <span>{normalizedCustomHairstyle.length}/600</span>
               </div>
             </div>
 
@@ -695,9 +753,12 @@ export default function Home() {
                 <HairstyleCard
                   key={preset.id}
                   preset={preset}
-                  selected={selectedId === preset.id}
+                  selected={hairstyleMode === "preset" && selectedId === preset.id}
                   recommended={recommendedIds.has(preset.id)}
-                  onSelect={() => setSelectedId(preset.id)}
+                  onSelect={() => {
+                    setSelectedId(preset.id);
+                    setHairstyleMode("preset");
+                  }}
                 />
               ))}
             </div>
@@ -708,7 +769,7 @@ export default function Home() {
               <div>
                 <h2 className="text-lg font-bold text-slate-950">生成预览</h2>
                 <p className="mt-1 text-sm text-slate-500">
-                  将原图头发替换为：{selectedPreset.name}
+                  将原图头发替换为：{currentHairstyleLabel}
                   {hasMask ? "，仅编辑手绘 mask 区域" : "，未绘制 mask 时会尝试只改头发"}
                 </p>
               </div>
@@ -754,7 +815,7 @@ export default function Home() {
             <div className="mt-4 rounded-lg border border-slate-200 bg-white p-3">
               <p className="text-sm font-semibold text-slate-800">当前生成设置</p>
               <div className="mt-3 grid gap-2 text-sm text-slate-600 sm:grid-cols-2">
-                <div>发型：<span className="font-semibold text-slate-900">{referenceFile ? `${selectedPreset.name}（参考图优先）` : selectedPreset.name}</span></div>
+                <div>发型：<span className="font-semibold text-slate-900">{referenceFile ? `${currentHairstyleLabel}（参考图优先）` : currentHairstyleLabel}</span></div>
                 <div>参考图：<span className="font-semibold text-slate-900">{referenceFile ? "已上传" : "未上传"}</span></div>
                 <div>
                   当前发色：

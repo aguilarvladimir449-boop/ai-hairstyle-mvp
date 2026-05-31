@@ -20,6 +20,18 @@ const intensityOptions: Array<{ value: ColorIntensity; label: string }> = [
   { value: "bold", label: "鲜明" }
 ];
 
+async function readApiPayload(response: Response) {
+  try {
+    return await response.json();
+  } catch {
+    if (response.status === 504 || response.status === 502) {
+      return { error: "AI 精修请求超时或被服务器中断，已保留本地预览结果。" };
+    }
+
+    return { error: "服务器返回了无法解析的响应，已保留本地预览结果。" };
+  }
+}
+
 export function HairColorEditor({ imageUrl }: HairColorEditorProps) {
   const maskEditorRef = useRef<HairMaskEditorHandle | null>(null);
   const sourceImageRef = useRef<HTMLImageElement | null>(null);
@@ -115,7 +127,7 @@ export function HairColorEditor({ imageUrl }: HairColorEditorProps) {
         method: "POST",
         body: formData
       });
-      const payload = await response.json();
+      const payload = await readApiPayload(response);
       if (!response.ok) {
         throw new Error(payload?.error || "AI 精修发色失败。");
       }

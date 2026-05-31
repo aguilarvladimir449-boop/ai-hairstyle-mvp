@@ -95,13 +95,16 @@ export function HairColorPicker({
               <div className="flex items-start gap-3">
                 <span
                   className={clsx(
-                    "flex h-9 w-9 shrink-0 items-center justify-center rounded-md border",
+                    "relative flex h-9 w-9 shrink-0 items-center justify-center rounded-md border",
                     selected && "border-teal-200 bg-white text-teal-700",
                     !selected && !disabled && "border-slate-200 bg-slate-50 text-slate-600",
                     disabled && "border-slate-200 bg-white text-slate-400"
                   )}
                 >
                   {disabled ? <LockKeyhole className="h-4 w-4" aria-hidden="true" /> : <Icon className="h-4 w-4" aria-hidden="true" />}
+                  {selected ? (
+                    <CheckCircle2 className="absolute -right-1 -top-1 h-4 w-4 rounded-full bg-white text-teal-600" aria-hidden="true" />
+                  ) : null}
                 </span>
                 <span className="min-w-0">
                   <span className={clsx("block text-sm font-semibold", disabled ? "text-slate-500" : "text-slate-900")}>{option.label}</span>
@@ -110,7 +113,6 @@ export function HairColorPicker({
                   </span>
                 </span>
               </div>
-              {selected ? <CheckCircle2 className="absolute right-3 top-3 h-4 w-4 text-teal-600" aria-hidden="true" /> : null}
             </button>
           );
         })}

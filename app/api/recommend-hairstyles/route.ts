@@ -4,6 +4,7 @@ import { hairstylePresetById, hairstylePresets } from "@/lib/hairstylePresets";
 import { fileToDataUrl, validateImageFile } from "@/lib/imageValidation";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 type Recommendation = {
   hairstyleId: string;

@@ -7,6 +7,7 @@ import { buildHairstylePrompt } from "@/lib/hairstylePrompt";
 import type { GenerateHairstyleInput } from "@/lib/hairstyleProviderTypes";
 
 export const runtime = "nodejs";
+export const maxDuration = 300;
 
 type HairstyleResponse = {
   imageUrl: string;

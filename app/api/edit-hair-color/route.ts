@@ -5,6 +5,7 @@ import { fileToDataUrl, validateImageFile } from "@/lib/imageValidation";
 import type { ColorIntensity } from "@/lib/hairColorTransform";
 
 export const runtime = "nodejs";
+export const maxDuration = 300;
 
 const intensityLabels: Record<ColorIntensity, string> = {
   natural: "自然低调",

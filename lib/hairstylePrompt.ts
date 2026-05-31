@@ -5,6 +5,7 @@ export type BuildHairstylePromptInput = {
   preset?: HairstylePreset;
   hasReferenceImage?: boolean;
   selectedHairColor?: SelectedHairColor;
+  useOriginalHairColor?: boolean;
   useReferenceHairColor?: boolean;
 };
 
@@ -12,6 +13,7 @@ export function buildHairstylePrompt({
   preset,
   hasReferenceImage = false,
   selectedHairColor,
+  useOriginalHairColor = false,
   useReferenceHairColor = false
 }: BuildHairstylePromptInput) {
   const parts = [
@@ -33,7 +35,9 @@ export function buildHairstylePrompt({
     parts.push(`目标预设发型：${preset.name}。${preset.prompt}`);
   }
 
-  if (useReferenceHairColor && hasReferenceImage) {
+  if (useOriginalHairColor) {
+    parts.push("发色要求：保留第一张用户原图中的原始头发颜色。只改变发型形状、长度、层次或刘海等造型，不要染发，不要估算或替换成其他颜色。");
+  } else if (useReferenceHairColor && hasReferenceImage) {
     parts.push("发色也参考发型参考图中的原始发色，同时保持真实发丝质感、自然高光和阴影。");
   } else if (selectedHairColor) {
     const colorName = selectedHairColor.label ? `${selectedHairColor.label} ` : "";

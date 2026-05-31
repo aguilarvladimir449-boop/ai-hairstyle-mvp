@@ -106,6 +106,7 @@ export async function POST(request: Request) {
     const mask = formData.get("mask");
     const hairstyleId = formData.get("hairstyleId");
     const quality = getRequestedQuality(formData.get("quality"));
+    const useOriginalHairColor = parseBoolean(formData.get("useOriginalHairColor"));
     const useReferenceHairColor = parseBoolean(formData.get("useReferenceHairColor"));
     const selectedHairColor = parseSelectedHairColor(formData.get("selectedHairColor"));
     const hairstyleIdValue = typeof hairstyleId === "string" ? hairstyleId.trim() : "";
@@ -144,6 +145,7 @@ export async function POST(request: Request) {
       preset,
       hasReferenceImage: Boolean(referenceImageFile),
       selectedHairColor,
+      useOriginalHairColor,
       useReferenceHairColor
     });
 
@@ -153,6 +155,7 @@ export async function POST(request: Request) {
       hairstyleReferenceImage: referenceImageFile || undefined,
       mask: maskFile || undefined,
       selectedHairColor,
+      useOriginalHairColor,
       useReferenceHairColor,
       prompt
     };

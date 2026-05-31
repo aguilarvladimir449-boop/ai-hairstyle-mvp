@@ -7,6 +7,7 @@ export type GenerateHairstyleInput = {
   hairstyleReferenceImage?: File | Blob | Buffer;
   mask?: File | Blob | Buffer;
   selectedHairColor?: SelectedHairColor;
+  useOriginalHairColor?: boolean;
   useReferenceHairColor?: boolean;
   prompt: string;
 };

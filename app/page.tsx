@@ -8,7 +8,6 @@ import { Brush, Download, Eraser, Loader2, RotateCcw, Search, Sparkles, Wand2 } 
 import { HairColorPicker } from "@/components/HairColorPicker";
 import { HairColorEditor } from "@/components/HairColorEditor";
 import { ImageUploader } from "@/components/ImageUploader";
-import { estimateHairColorFromImage } from "@/lib/hairColorDetection";
 import {
   categoryLabels,
   difficultyLabels,
@@ -27,6 +26,7 @@ type Recommendation = {
 
 type CategoryFilter = HairstyleCategory | "all";
 type ImageQuality = "low" | "medium" | "high";
+type HairColorSource = "original" | "reference" | "custom";
 
 const categoryTabs: CategoryFilter[] = ["all", "short", "medium", "long", "bangs", "curly", "color", "style"];
 const imageQualityOptions: Array<{ value: ImageQuality; label: string; description: string }> = [
@@ -127,7 +127,6 @@ export default function Home() {
   const maskImageRef = useRef<HTMLImageElement | null>(null);
   const maskCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const isDrawingRef = useRef(false);
-  const hairColorDetectionRunRef = useRef(0);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState("");
   const [referenceFile, setReferenceFile] = useState<File | null>(null);
@@ -146,7 +145,7 @@ export default function Home() {
     lightness: 50,
     mode: "subtle"
   });
-  const [useReferenceHairColor, setUseReferenceHairColor] = useState(false);
+  const [hairColorSource, setHairColorSource] = useState<HairColorSource>("original");
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [generatedImage, setGeneratedImage] = useState("");
   const [isMockResult, setIsMockResult] = useState(false);
@@ -155,11 +154,12 @@ export default function Home() {
   const [isRecommending, setIsRecommending] = useState(false);
   const [generationProgress, setGenerationProgress] = useState(0);
   const [generationFailed, setGenerationFailed] = useState(false);
-  const [isDetectingHairColor, setIsDetectingHairColor] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
   const selectedPreset = hairstylePresetById.get(selectedId) || hairstylePresets[0];
+  const useOriginalHairColor = hairColorSource === "original";
+  const useReferenceHairColor = hairColorSource === "reference" && Boolean(referenceFile);
   const recommendedIds = useMemo(() => new Set(recommendations.map((item) => item.hairstyleId)), [recommendations]);
 
   const filteredPresets = useMemo(() => {
@@ -314,7 +314,6 @@ export default function Home() {
   }
 
   function handleImageChange(file: File | null) {
-    hairColorDetectionRunRef.current += 1;
     setError("");
     setNotice("");
     setGeneratedImage("");
@@ -322,13 +321,11 @@ export default function Home() {
     setIsMockResult(false);
     setIsMockRecommend(false);
     setGenerationFailed(false);
-    setIsDetectingHairColor(false);
     setHasMask(false);
 
     if (!file) {
       setImageFile(null);
       setImagePreview("");
-      setIsDetectingHairColor(false);
       return;
     }
 
@@ -345,32 +342,6 @@ export default function Home() {
     clearMask();
     setImageFile(file);
     setImagePreview(URL.createObjectURL(file));
-    detectOriginalHairColor(file);
-  }
-
-  async function detectOriginalHairColor(file: File) {
-    const runId = hairColorDetectionRunRef.current + 1;
-    hairColorDetectionRunRef.current = runId;
-    setIsDetectingHairColor(true);
-
-    try {
-      const detectedColor = await estimateHairColorFromImage(file);
-      if (hairColorDetectionRunRef.current !== runId || !detectedColor) {
-        return;
-      }
-
-      setSelectedHairColor(detectedColor);
-      setUseReferenceHairColor(false);
-      setNotice(`已根据上传照片估算原图发色：${detectedColor.hex}。`);
-    } catch {
-      if (hairColorDetectionRunRef.current === runId) {
-        setNotice("已上传照片，但暂时无法自动估算原图发色，可以手动选择发色。");
-      }
-    } finally {
-      if (hairColorDetectionRunRef.current === runId) {
-        setIsDetectingHairColor(false);
-      }
-    }
   }
 
   function handleReferenceChange(file: File | null) {
@@ -403,7 +374,7 @@ export default function Home() {
     }
     setReferenceFile(null);
     setReferencePreview("");
-    setUseReferenceHairColor(false);
+    setHairColorSource((current) => (current === "reference" ? "original" : current));
   }
 
   async function requestRecommendations() {
@@ -460,8 +431,9 @@ export default function Home() {
       if (referenceFile) {
         formData.append("hairstyleReferenceImage", referenceFile);
       }
+      formData.append("useOriginalHairColor", String(useOriginalHairColor));
       formData.append("useReferenceHairColor", String(useReferenceHairColor && Boolean(referenceFile)));
-      if (!useReferenceHairColor) {
+      if (hairColorSource === "custom") {
         formData.append("selectedHairColor", JSON.stringify(selectedHairColor));
       }
       const maskBlob = await exportMaskBlob();
@@ -627,11 +599,10 @@ export default function Home() {
 
           <HairColorPicker
             selectedColor={selectedHairColor}
-            useReferenceHairColor={useReferenceHairColor}
+            hairColorSource={hairColorSource}
             hasReferenceImage={Boolean(referenceFile)}
-            isDetectingOriginalHairColor={isDetectingHairColor}
             onColorChange={setSelectedHairColor}
-            onUseReferenceHairColorChange={setUseReferenceHairColor}
+            onHairColorSourceChange={setHairColorSource}
           />
 
           {recommendations.length > 0 ? (
@@ -788,11 +759,15 @@ export default function Home() {
                 <div>
                   当前发色：
                   <span className="ml-1 inline-flex items-center gap-2 font-semibold text-slate-900">
-                    {!useReferenceHairColor ? <span className="h-4 w-4 rounded border border-slate-200" style={{ backgroundColor: normalizeHexColor(selectedHairColor.hex) || "#2B211B" }} /> : null}
-                    {useReferenceHairColor ? "使用参考图原始发色" : `${selectedHairColor.label || "自定义发色"} ${normalizeHexColor(selectedHairColor.hex) || selectedHairColor.hex}`}
+                    {hairColorSource === "custom" ? <span className="h-4 w-4 rounded border border-slate-200" style={{ backgroundColor: normalizeHexColor(selectedHairColor.hex) || "#2B211B" }} /> : null}
+                    {hairColorSource === "original"
+                      ? "保留用户原图发色"
+                      : useReferenceHairColor
+                        ? "使用参考图发色"
+                        : `${selectedHairColor.label || "自定义发色"} ${normalizeHexColor(selectedHairColor.hex) || selectedHairColor.hex}`}
                   </span>
                 </div>
-                <div>染发模式：<span className="font-semibold text-slate-900">{useReferenceHairColor ? "跟随参考图" : hairColorModeLabels[selectedHairColor.mode || "full"]}</span></div>
+                <div>染发模式：<span className="font-semibold text-slate-900">{hairColorSource === "original" ? "保留原图" : useReferenceHairColor ? "跟随参考图" : hairColorModeLabels[selectedHairColor.mode || "full"]}</span></div>
               </div>
             </div>
 

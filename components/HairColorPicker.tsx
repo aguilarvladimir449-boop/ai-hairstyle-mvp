@@ -1,5 +1,7 @@
 "use client";
 
+import type { LucideIcon } from "lucide-react";
+import { CheckCircle2, ImagePlus, LockKeyhole, Palette, Sparkles } from "lucide-react";
 import clsx from "clsx";
 import { hairColorModeLabels, hairColorPresets, normalizeHexColor, type HairColorMode, type SelectedHairColor } from "@/lib/hairColor";
 
@@ -15,10 +17,15 @@ type HairColorPickerProps = {
 
 const modeOptions: HairColorMode[] = ["full", "subtle", "highlight", "gradient", "inner"];
 
-const sourceOptions: Array<{ value: HairColorSource; label: string; description: string }> = [
-  { value: "original", label: "保留原图发色", description: "只换发型，尽量保留用户照片里的头发颜色。" },
-  { value: "reference", label: "使用参考图发色", description: "上传参考图后，发色也跟随参考图。" },
-  { value: "custom", label: "自定义发色", description: "使用预设、调色盘或 HEX 指定目标发色。" }
+const sourceOptions: Array<{
+  value: HairColorSource;
+  label: string;
+  description: string;
+  icon: LucideIcon;
+}> = [
+  { value: "original", label: "保留原图发色", description: "只换发型，尽量保留用户照片里的头发颜色。", icon: Sparkles },
+  { value: "reference", label: "使用参考图发色", description: "上传参考图后，发色也跟随参考图。", icon: ImagePlus },
+  { value: "custom", label: "自定义发色", description: "使用预设、调色盘或 HEX 指定目标发色。", icon: Palette }
 ];
 
 export function HairColorPicker({
@@ -68,7 +75,10 @@ export function HairColorPicker({
 
       <div className="mt-4 grid gap-2 sm:grid-cols-3">
         {sourceOptions.map((option) => {
+          const Icon = option.icon;
           const disabled = option.value === "reference" && !hasReferenceImage;
+          const selected = hairColorSource === option.value;
+
           return (
             <button
               key={option.value}
@@ -76,21 +86,45 @@ export function HairColorPicker({
               disabled={disabled}
               onClick={() => onHairColorSourceChange(option.value)}
               className={clsx(
-                "rounded-lg border p-3 text-left transition disabled:cursor-not-allowed disabled:opacity-50",
-                hairColorSource === option.value ? "border-teal-500 bg-teal-50" : "border-slate-200 bg-white hover:border-teal-300"
+                "relative rounded-lg border p-3 text-left transition focus:outline-none focus:ring-2 focus:ring-teal-500",
+                selected && "border-teal-500 bg-teal-50 shadow-sm",
+                !selected && !disabled && "border-slate-200 bg-white hover:border-teal-300 hover:bg-teal-50/40",
+                disabled && "border-slate-200 bg-slate-50 text-slate-400"
               )}
             >
-              <span className="block text-sm font-semibold text-slate-900">{option.label}</span>
-              <span className="mt-1 block text-xs leading-5 text-slate-500">
-                {disabled ? "上传发型参考图后可使用。" : option.description}
-              </span>
+              <div className="flex items-start gap-3">
+                <span
+                  className={clsx(
+                    "flex h-9 w-9 shrink-0 items-center justify-center rounded-md border",
+                    selected && "border-teal-200 bg-white text-teal-700",
+                    !selected && !disabled && "border-slate-200 bg-slate-50 text-slate-600",
+                    disabled && "border-slate-200 bg-white text-slate-400"
+                  )}
+                >
+                  {disabled ? <LockKeyhole className="h-4 w-4" aria-hidden="true" /> : <Icon className="h-4 w-4" aria-hidden="true" />}
+                </span>
+                <span className="min-w-0">
+                  <span className={clsx("block text-sm font-semibold", disabled ? "text-slate-500" : "text-slate-900")}>{option.label}</span>
+                  <span className="mt-1 block text-xs leading-5 text-slate-500">
+                    {disabled ? "上传发型参考图后可使用。" : option.description}
+                  </span>
+                </span>
+              </div>
+              {selected ? <CheckCircle2 className="absolute right-3 top-3 h-4 w-4 text-teal-600" aria-hidden="true" /> : null}
             </button>
           );
         })}
       </div>
 
-      <div className={clsx("mt-4 space-y-4", !isCustomColor && "opacity-45")}>
-        <div>
+      <div className={clsx("mt-4 space-y-4 rounded-lg border p-3 transition", isCustomColor ? "border-slate-200 bg-white" : "border-slate-200 bg-slate-50")}>
+        {!isCustomColor ? (
+          <div className="flex items-center gap-2 rounded-md bg-white px-3 py-2 text-xs font-medium text-slate-500">
+            <LockKeyhole className="h-4 w-4 text-slate-400" aria-hidden="true" />
+            选择“自定义发色”后可使用预设、调色盘和颜色参数。
+          </div>
+        ) : null}
+
+        <div className={clsx(!isCustomColor && "opacity-55")}>
           <p className="mb-2 text-sm font-semibold text-slate-800">预设发色</p>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
             {hairColorPresets.map((preset) => (
@@ -100,8 +134,9 @@ export function HairColorPicker({
                 disabled={!isCustomColor}
                 onClick={() => updateColor({ hex: preset.hex, label: preset.label })}
                 className={clsx(
-                  "flex items-center gap-2 rounded-lg border p-2 text-left transition disabled:cursor-not-allowed",
-                  selectedColor.hex.toUpperCase() === preset.hex.toUpperCase() && isCustomColor
+                  "flex items-center gap-2 rounded-lg border p-2 text-left transition",
+                  !isCustomColor && "bg-white text-slate-400",
+                  isCustomColor && selectedColor.hex.toUpperCase() === preset.hex.toUpperCase()
                     ? "border-teal-500 bg-teal-50"
                     : "border-slate-200 bg-white hover:border-teal-300"
                 )}
@@ -113,7 +148,7 @@ export function HairColorPicker({
           </div>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-[auto_1fr] sm:items-center">
+        <div className={clsx("grid gap-3 sm:grid-cols-[auto_1fr] sm:items-center", !isCustomColor && "opacity-55")}>
           <label className="text-sm font-semibold text-slate-800" htmlFor="hair-color-picker">
             调色盘
           </label>
@@ -123,7 +158,7 @@ export function HairColorPicker({
             disabled={!isCustomColor}
             value={normalizedHex}
             onChange={(event) => updateColor({ hex: event.target.value.toUpperCase(), label: "自定义发色" })}
-            className="h-11 w-full rounded-md border border-slate-300 bg-white p-1 disabled:cursor-not-allowed"
+            className="h-11 w-full rounded-md border border-slate-300 bg-white p-1 disabled:bg-slate-100"
           />
 
           <label className="text-sm font-semibold text-slate-800" htmlFor="hair-color-hex">
@@ -136,11 +171,11 @@ export function HairColorPicker({
             onChange={(event) => updateColor({ hex: event.target.value, label: "自定义发色" })}
             onBlur={() => updateColor({ hex: normalizedHex })}
             placeholder="#7A4B32"
-            className="w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-teal-500 focus:ring-teal-500 disabled:cursor-not-allowed disabled:bg-slate-100"
+            className="w-full rounded-md border-slate-300 text-sm shadow-sm focus:border-teal-500 focus:ring-teal-500 disabled:bg-white disabled:text-slate-400"
           />
         </div>
 
-        <div>
+        <div className={clsx(!isCustomColor && "opacity-55")}>
           <p className="mb-2 text-sm font-semibold text-slate-800">染发模式</p>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
             {modeOptions.map((mode) => (
@@ -150,8 +185,9 @@ export function HairColorPicker({
                 disabled={!isCustomColor}
                 onClick={() => updateColor({ mode })}
                 className={clsx(
-                  "rounded-md px-3 py-2 text-sm font-semibold transition disabled:cursor-not-allowed",
-                  selectedColor.mode === mode && isCustomColor ? "bg-slate-950 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                  "rounded-md px-3 py-2 text-sm font-semibold transition",
+                  selectedColor.mode === mode && isCustomColor ? "bg-slate-950 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200",
+                  !isCustomColor && "bg-white text-slate-400"
                 )}
               >
                 {hairColorModeLabels[mode]}
@@ -160,7 +196,7 @@ export function HairColorPicker({
           </div>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className={clsx("grid gap-3 sm:grid-cols-2", !isCustomColor && "opacity-55")}>
           <label className="text-sm font-semibold text-slate-800">
             饱和度 {selectedColor.saturation ?? 50}
             <input
@@ -170,7 +206,7 @@ export function HairColorPicker({
               value={selectedColor.saturation ?? 50}
               disabled={!isCustomColor}
               onChange={(event) => updateColor({ saturation: Number(event.target.value) })}
-              className="mt-2 w-full accent-teal-600 disabled:cursor-not-allowed"
+              className="mt-2 w-full accent-teal-600"
             />
           </label>
           <label className="text-sm font-semibold text-slate-800">
@@ -182,7 +218,7 @@ export function HairColorPicker({
               value={selectedColor.lightness ?? 50}
               disabled={!isCustomColor}
               onChange={(event) => updateColor({ lightness: Number(event.target.value) })}
-              className="mt-2 w-full accent-teal-600 disabled:cursor-not-allowed"
+              className="mt-2 w-full accent-teal-600"
             />
           </label>
         </div>

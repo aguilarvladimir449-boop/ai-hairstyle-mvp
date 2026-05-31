@@ -7,6 +7,7 @@ type HairColorPickerProps = {
   selectedColor: SelectedHairColor;
   useReferenceHairColor: boolean;
   hasReferenceImage: boolean;
+  isDetectingOriginalHairColor?: boolean;
   onColorChange: (color: SelectedHairColor) => void;
   onUseReferenceHairColorChange: (value: boolean) => void;
 };
@@ -17,10 +18,12 @@ export function HairColorPicker({
   selectedColor,
   useReferenceHairColor,
   hasReferenceImage,
+  isDetectingOriginalHairColor,
   onColorChange,
   onUseReferenceHairColorChange
 }: HairColorPickerProps) {
   const normalizedHex = normalizeHexColor(selectedColor.hex) || "#2B211B";
+  const sectionTitle = isDetectingOriginalHairColor ? "正在估算原图发色" : undefined;
 
   function updateColor(partial: Partial<SelectedHairColor>) {
     onColorChange({
@@ -30,7 +33,7 @@ export function HairColorPicker({
   }
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <section title={sectionTitle} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="text-lg font-bold text-slate-950">发色设置</h2>

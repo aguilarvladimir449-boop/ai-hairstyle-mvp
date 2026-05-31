@@ -8,6 +8,7 @@ import { Brush, Download, Eraser, Loader2, RotateCcw, Search, Sparkles, Wand2 } 
 import { HairColorPicker } from "@/components/HairColorPicker";
 import { HairColorEditor } from "@/components/HairColorEditor";
 import { ImageUploader } from "@/components/ImageUploader";
+import { estimateHairColorFromImage } from "@/lib/hairColorDetection";
 import {
   categoryLabels,
   difficultyLabels,
@@ -126,6 +127,7 @@ export default function Home() {
   const maskImageRef = useRef<HTMLImageElement | null>(null);
   const maskCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const isDrawingRef = useRef(false);
+  const hairColorDetectionRunRef = useRef(0);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState("");
   const [referenceFile, setReferenceFile] = useState<File | null>(null);
@@ -153,6 +155,7 @@ export default function Home() {
   const [isRecommending, setIsRecommending] = useState(false);
   const [generationProgress, setGenerationProgress] = useState(0);
   const [generationFailed, setGenerationFailed] = useState(false);
+  const [isDetectingHairColor, setIsDetectingHairColor] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
@@ -311,6 +314,7 @@ export default function Home() {
   }
 
   function handleImageChange(file: File | null) {
+    hairColorDetectionRunRef.current += 1;
     setError("");
     setNotice("");
     setGeneratedImage("");
@@ -318,11 +322,13 @@ export default function Home() {
     setIsMockResult(false);
     setIsMockRecommend(false);
     setGenerationFailed(false);
+    setIsDetectingHairColor(false);
     setHasMask(false);
 
     if (!file) {
       setImageFile(null);
       setImagePreview("");
+      setIsDetectingHairColor(false);
       return;
     }
 
@@ -339,6 +345,32 @@ export default function Home() {
     clearMask();
     setImageFile(file);
     setImagePreview(URL.createObjectURL(file));
+    detectOriginalHairColor(file);
+  }
+
+  async function detectOriginalHairColor(file: File) {
+    const runId = hairColorDetectionRunRef.current + 1;
+    hairColorDetectionRunRef.current = runId;
+    setIsDetectingHairColor(true);
+
+    try {
+      const detectedColor = await estimateHairColorFromImage(file);
+      if (hairColorDetectionRunRef.current !== runId || !detectedColor) {
+        return;
+      }
+
+      setSelectedHairColor(detectedColor);
+      setUseReferenceHairColor(false);
+      setNotice(`已根据上传照片估算原图发色：${detectedColor.hex}。`);
+    } catch {
+      if (hairColorDetectionRunRef.current === runId) {
+        setNotice("已上传照片，但暂时无法自动估算原图发色，可以手动选择发色。");
+      }
+    } finally {
+      if (hairColorDetectionRunRef.current === runId) {
+        setIsDetectingHairColor(false);
+      }
+    }
   }
 
   function handleReferenceChange(file: File | null) {
@@ -597,6 +629,7 @@ export default function Home() {
             selectedColor={selectedHairColor}
             useReferenceHairColor={useReferenceHairColor}
             hasReferenceImage={Boolean(referenceFile)}
+            isDetectingOriginalHairColor={isDetectingHairColor}
             onColorChange={setSelectedHairColor}
             onUseReferenceHairColorChange={setUseReferenceHairColor}
           />

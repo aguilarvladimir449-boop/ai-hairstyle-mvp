@@ -41,6 +41,21 @@ function getErrorMessage(payload: unknown, fallback: string) {
   return fallback;
 }
 
+async function readApiPayload(response: Response) {
+  try {
+    return await response.json();
+  } catch {
+    if (response.status === 504 || response.status === 502) {
+      return {
+        error:
+          "生成请求超时或被服务器中断。请先选择“快速”质量、不使用 mask 后重试；如果部署在 Netlify，长图像生成可能会超过函数时长限制。"
+      };
+    }
+
+    return { error: "服务器返回了无法解析的响应，请稍后重试。" };
+  }
+}
+
 function Pill({ children, tone = "neutral" }: { children: React.ReactNode; tone?: "neutral" | "accent" | "warm" }) {
   return (
     <span
@@ -121,7 +136,7 @@ export default function Home() {
   const [brushSize, setBrushSize] = useState(46);
   const [maskMode, setMaskMode] = useState<"draw" | "erase">("draw");
   const [hasMask, setHasMask] = useState(false);
-  const [imageQuality, setImageQuality] = useState<ImageQuality>("medium");
+  const [imageQuality, setImageQuality] = useState<ImageQuality>("low");
   const [selectedHairColor, setSelectedHairColor] = useState<SelectedHairColor>({
     hex: "#2B211B",
     label: "黑茶色",
@@ -137,6 +152,7 @@ export default function Home() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isRecommending, setIsRecommending] = useState(false);
   const [generationProgress, setGenerationProgress] = useState(0);
+  const [generationFailed, setGenerationFailed] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
@@ -301,6 +317,7 @@ export default function Home() {
     setRecommendations([]);
     setIsMockResult(false);
     setIsMockRecommend(false);
+    setGenerationFailed(false);
     setHasMask(false);
 
     if (!file) {
@@ -375,7 +392,7 @@ export default function Home() {
         method: "POST",
         body: formData
       });
-      const payload = await response.json();
+      const payload = await readApiPayload(response);
 
       if (!response.ok) {
         throw new Error(getErrorMessage(payload, "AI 推荐失败，请手动选择发型。"));
@@ -400,6 +417,7 @@ export default function Home() {
     setError("");
     setNotice("");
     setIsGenerating(true);
+    setGenerationFailed(false);
 
     try {
       const formData = new FormData();
@@ -423,7 +441,7 @@ export default function Home() {
         method: "POST",
         body: formData
       });
-      const payload = await response.json();
+      const payload = await readApiPayload(response);
 
       if (!response.ok) {
         throw new Error(getErrorMessage(payload, "生成发型预览失败。"));
@@ -433,9 +451,11 @@ export default function Home() {
       setIsMockResult(Boolean(payload.mock));
       setNotice(payload.message || (payload.usedMask ? "发型预览已生成，本次使用了手绘 mask。" : "发型预览已生成。"));
       setGenerationProgress(100);
+      setGenerationFailed(false);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "生成发型预览失败。");
-      setGenerationProgress(0);
+      setGenerationFailed(true);
+      setGenerationProgress((current) => Math.max(current, 40));
     } finally {
       setIsGenerating(false);
     }
@@ -746,7 +766,7 @@ export default function Home() {
             {(isGenerating || generationProgress > 0) && (
               <div className="mt-4 rounded-lg border border-teal-100 bg-teal-50 p-3">
                 <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-semibold text-teal-950">{isGenerating ? "正在生成发型预览" : "生成完成"}</p>
+                  <p className="text-sm font-semibold text-teal-950">{isGenerating ? "正在生成发型预览" : generationFailed ? "生成失败" : "生成完成"}</p>
                   <span className="text-sm font-semibold text-teal-700">{Math.round(generationProgress)}%</span>
                 </div>
                 <div className="mt-3 h-2 overflow-hidden rounded-full bg-white">
@@ -760,7 +780,9 @@ export default function Home() {
                     ? hasMask
                       ? "手绘 mask 编辑可能需要更久，请保持页面打开。"
                       : "中转站生成可能需要几十秒，请稍等。"
-                    : "结果已返回，可以查看或下载生成图。"}
+                    : generationFailed
+                      ? "请求可能超时或被接口中断。建议先用“快速”质量、不画 mask 重试；线上 Netlify 普通函数对长时间图像生成不太友好。"
+                      : "结果已返回，可以查看或下载生成图。"}
                 </p>
               </div>
             )}
